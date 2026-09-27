@@ -17,6 +17,7 @@ Options:
   --auto          Select every module and skip all questions.
   --dry-run       Show what would change without changing anything.
   --only LIST     Run only these modules, comma separated (for example: ssh,firewall).
+  --remote HOST   Deploy and execute on a remote host over SSH.
   --list          List the modules in execution order and exit.
   --version       Print the version and exit.
   -h, --help      Show this help and exit.
@@ -37,16 +38,26 @@ list_modules() {
 
 AUTO=0
 ONLY=""
+REMOTE_HOST=""
+FORWARD_ARGS=()
+
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --auto) AUTO=1 ;;
-    --dry-run) DRY_RUN=1 ;;
+    --auto) AUTO=1; FORWARD_ARGS+=("$1") ;;
+    --dry-run) DRY_RUN=1; FORWARD_ARGS+=("$1") ;;
     --only)
       [[ $# -ge 2 ]] || die "--only needs a comma separated list of modules."
       ONLY=$2
+      FORWARD_ARGS+=("$1" "$2")
       shift
       ;;
-    --only=*) ONLY=${1#*=} ;;
+    --only=*) ONLY=${1#*=}; FORWARD_ARGS+=("$1") ;;
+    --remote)
+      [[ $# -ge 2 ]] || die "--remote needs a target host (e.g. root@ip)."
+      REMOTE_HOST=$2
+      shift
+      ;;
+    --remote=*) REMOTE_HOST=${1#*=} ;;
     --list) list_modules; exit 0 ;;
     --version) echo "$BOOTSTRAP_VERSION"; exit 0 ;;
     -h | --help) usage; exit 0 ;;
@@ -54,6 +65,12 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
+
+if [[ -n $REMOTE_HOST ]]; then
+  log "Deploying to remote target $REMOTE_HOST..."
+  tar -c --exclude=.git -C "$REPO_ROOT" . | ssh -t "$REMOTE_HOST" "bash -c 'TMP=\$(mktemp -d /tmp/vps-bootstrap-XXXXXX) && tar -x -C \"\$TMP\" && cd \"\$TMP\" && sudo ./bootstrap.sh ${FORWARD_ARGS[*]} ; STATUS=\$? ; rm -rf \"\$TMP\" ; exit \$STATUS'"
+  exit $?
+fi
 
 [[ $EUID -eq 0 ]] || die "Run with sudo. Even --dry-run needs root to read the current state."
 
