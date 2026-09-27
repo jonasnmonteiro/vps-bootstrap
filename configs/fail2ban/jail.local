@@ -1,0 +1,9 @@
+[DEFAULT]
+ignoreip = @IGNORE_IP@
+bantime  = @BAN_TIME@
+findtime = 10m
+maxretry = @MAX_RETRY@
+backend  = systemd
+
+[sshd]
+enabled = true
