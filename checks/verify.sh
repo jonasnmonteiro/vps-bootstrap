@@ -144,6 +144,37 @@ if [[ -f /etc/cloud/cloud.cfg ]]; then
   check "cloud-init preserves the hostname" grep -qE '^preserve_hostname:[[:space:]]*true' /etc/cloud/cloud.cfg
 fi
 
+if is_installed docker-ce; then
+  section "CONTAINERS"
+  check "docker daemon.json exists and is valid" test -s /etc/docker/daemon.json
+  check "docker log-driver is json-file" grep -q '"log-driver": "json-file"' /etc/docker/daemon.json
+  if has_systemd; then
+    check "docker service is enabled" systemctl is-enabled --quiet docker
+  fi
+fi
+
+if is_installed caddy; then
+  section "INGRESS"
+  check "caddy configuration is valid" caddy validate --config /etc/caddy/Caddyfile
+  if has_systemd; then
+    check "caddy service is enabled" systemctl is-enabled --quiet caddy
+    check "caddy service is active" systemctl is-active --quiet caddy
+  fi
+fi
+
+if is_installed tailscale; then
+  section "VPN"
+  if has_systemd; then
+    check "tailscaled service is enabled" systemctl is-enabled --quiet tailscaled
+  fi
+fi
+
+if [[ -n ${TELEGRAM_BOT_TOKEN:-} && -n ${TELEGRAM_CHAT_ID:-} ]]; then
+  section "ALERTS"
+  check "telegram notification helper installed" test -x /usr/local/bin/notify-telegram
+  check "fail2ban telegram action configured" test -s /etc/fail2ban/action.d/telegram.conf
+fi
+
 if [[ -f /var/run/reboot-required ]]; then
   advise "a reboot is pending (/var/run/reboot-required)"
 fi

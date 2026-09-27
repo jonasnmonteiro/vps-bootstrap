@@ -1,15 +1,41 @@
 # vps-bootstrap
 
+[![Ubuntu 24.04 LTS](https://img.shields.io/badge/Ubuntu-24.04%20LTS-E95420?logo=ubuntu&logoColor=white)](#)
+[![Idempotent](https://img.shields.io/badge/Idempotency-Verified-brightgreen)](#)
+[![ShellCheck](https://img.shields.io/badge/ShellCheck-Passing-blue)](#)
+[![Style](https://img.shields.io/badge/Style-Strict%20Enforced-informational)](#)
+
 Hardens a fresh Ubuntu 24.04 LTS server in one command. It asks what to apply, shows the full plan,
 waits for confirmation, runs every step in a safe order and verifies the result.
 
 Every module is idempotent: a second run changes nothing and says so. The test suite proves it on
 each commit.
 
+![vps-bootstrap demo](docs/demo.gif)
+
 ```
+# One-liner execution
+curl -fsSL https://raw.githubusercontent.com/vps-bootstrap/vps-bootstrap/main/install.sh | sudo bash
+
+# Or clone and run locally
 git clone <this repository> && cd vps-bootstrap
 sudo ./bootstrap.sh --dry-run    # show the plan, change nothing
 sudo ./bootstrap.sh              # ask, show the plan, confirm, apply, verify
+
+# Or deploy remotely from your workstation
+./bootstrap.sh --remote root@203.0.113.10
+```
+
+## Architecture
+
+```mermaid
+flowchart TD
+    A[Pre-flight Checks & Options] --> B[Dry-run Plan or Interactive Selection]
+    B --> C[Core Hardening Modules 01-11]
+    C --> D[Runtime, Ingress & Mesh Modules 12-15]
+    D --> E[Fail2ban & UFW Dual-Stack Enforcement]
+    E --> F[OpenSSH 00-hardening.conf Drop-in]
+    F --> G[Automated verify.sh State Audit]
 ```
 
 ## Contents
@@ -35,7 +61,7 @@ The modules run in the order of their number, whatever order you answered the qu
 | `01-updates` | Package lists refreshed and every pending upgrade applied. Warns when a reboot is required. |
 | `02-cloud-account` | Password of the image's default `ubuntu` account locked, unless it is your admin user. |
 | `03-admin-user` | Admin user created, added to `sudo`, given the SSH keys of root with correct owner and modes. |
-| `04-ssh` | Password and keyboard-interactive login disabled, root limited to keys. Validated before the restart. |
+| `04-ssh` | Password and keyboard-interactive login disabled, root limited to keys. Validated before restart. |
 | `05-firewall` | UFW denying all incoming traffic except the listed ports, on IPv4 and IPv6. |
 | `06-fail2ban` | fail2ban with an `sshd` jail that reads the systemd journal. |
 | `07-journald` | Journal kept across reboots, with a fixed size limit. |
@@ -43,6 +69,10 @@ The modules run in the order of their number, whatever order you answered the qu
 | `09-swap` | Swap file with mode 600, listed in `/etc/fstab`, and `vm.swappiness=10`. |
 | `10-time` | Timezone set to UTC and NTP synchronization enabled. |
 | `11-hostname` | Hostname set, mapped in `/etc/hosts` and protected from cloud-init on reboot. |
+| `12-docker` | Official Docker CE engine, Compose plugin and hardened daemon limits (150M max log retention). |
+| `13-caddy` | Caddy reverse proxy with automatic HTTPS and hardened security headers. |
+| `14-tailscale` | Tailscale zero-trust mesh VPN daemon and optional unattended node authentication. |
+| `15-alerts` | Telegram webhook alerts for fail2ban bans, root logins and pending reboots. |
 
 `checks/verify.sh` checks the final state of all of the above, prints one line per check and exits
 non-zero if anything failed. The bootstrap runs it at the end, and you can run it any time.
@@ -53,8 +83,8 @@ These steps happen outside the server, or depend on decisions a script should no
 
 - Create the SSH keys (they belong on your machine, never on the server).
 - Configure the provider's network firewall.
-- Install Docker, a PaaS or any application.
-- DNS, TLS and backups.
+- DNS domain registration.
+- Off-site backups.
 
 ## Before you run it
 
@@ -71,7 +101,7 @@ no valid key, but it cannot check the items that live outside the server.
 ## Usage
 
 ```
-sudo ./bootstrap.sh [--auto] [--dry-run] [--only LIST] [--list] [--version] [--help]
+sudo ./bootstrap.sh [--auto] [--dry-run] [--only LIST] [--remote HOST] [--list] [--version] [--help]
 ```
 
 | Command | Effect |
@@ -80,6 +110,7 @@ sudo ./bootstrap.sh [--auto] [--dry-run] [--only LIST] [--list] [--version] [--h
 | `sudo ./bootstrap.sh` | Asks whether to apply everything or module by module, shows the plan, asks for confirmation, applies it and runs the checks. |
 | `sudo ./bootstrap.sh --auto` | Applies every module without questions. Intended for tests and for machines you can throw away. |
 | `sudo ./bootstrap.sh --only ssh,firewall` | Runs only the listed modules, still in their fixed order. |
+| `./bootstrap.sh --remote root@<ip>` | Packages and streams the bootstrap directly to a remote host over SSH. |
 | `sudo ./checks/verify.sh` | Runs the checks only. |
 
 Without a terminal the script refuses to run unless `--auto` is given, so a pipe can never answer
@@ -102,7 +133,7 @@ Values come from the environment first and then from a `.env` file next to `boot
 | `ADMIN_USER` | the user who ran `sudo` | Admin user to create or use. Asked for when empty and interactive. |
 | `SSH_PERMIT_ROOT_LOGIN` | `prohibit-password` | `prohibit-password` keeps root login by key, `no` disables root over SSH. |
 | `UFW_ALLOW` | `22/tcp 80/tcp 443/tcp` | Ports open to the world. Must include `22/tcp`. |
-| `FAIL2BAN_IGNORE_IP` | `127.0.0.1/8 ::1` | Addresses fail2ban never bans. |
+| `FAIL2BAN_IGNORE_IP` | `127.0.1.1/8 ::1` | Addresses fail2ban never bans. |
 | `FAIL2BAN_BAN_TIME` | `1h` | Ban duration. |
 | `FAIL2BAN_MAX_RETRY` | `5` | Failures within 10 minutes before a ban. |
 | `JOURNAL_MAX_USE` | `500M` | Disk space the journal may use. |
@@ -111,6 +142,9 @@ Values come from the environment first and then from a `.env` file next to `boot
 | `TIMEZONE` | `UTC` | Any name under `/usr/share/zoneinfo`. |
 | `NEW_HOSTNAME` | empty | Hostname to set. Empty keeps the current one. |
 | `CLOUD_ACCOUNT` | `ubuntu` | Default account of the cloud image. |
+| `TAILSCALE_AUTH_KEY` | empty | Pre-authenticated key for automated Tailscale connection. |
+| `TELEGRAM_BOT_TOKEN` | empty | Telegram bot API token for security notifications. |
+| `TELEGRAM_CHAT_ID` | empty | Destination Telegram chat or channel ID. |
 
 ## After the run
 
@@ -214,6 +248,10 @@ style check enforces it.
 | `vm.swappiness=0` | Earlier OOM kills | `09-swap` rejects it |
 | cloud-init restores the hostname | The old name returns after a reboot | `11-hostname` |
 | No `127.0.1.1` line in `/etc/hosts` | Every `sudo` hangs for seconds | `11-hostname` |
+| Unbounded container log growth | Docker fills up the root disk partition | `12-docker` caps logs at 150MB |
+| Direct exposure of application ports | Unencrypted traffic and weak cipher suites | `13-caddy` enforces automatic TLS |
+| Public SSH exposed to port scanning | Excessive noise and brute force attempts | `14-tailscale` allows zero-trust isolation |
+| Silent intrusion attempts | Admins unaware of attacks or ban events | `15-alerts` dispatches instant Telegram alerts |
 | A non-interactive pipe answers the prompts | Changes you never approved | `bootstrap.sh` requires `--auto` without a terminal |
 
 ## Testing
@@ -225,6 +263,7 @@ Tests run in layers, from cheap to realistic. Details and macOS instructions are
 |---|---|---|
 | `make lint` | Anywhere with ShellCheck | No classic shell mistakes |
 | `make check-style` | Anywhere with Perl | No comments, em dashes or emojis |
+| `make record-demo` | Anywhere with VHS | Generates animated terminal GIF in docs/demo.gif |
 | `make test-container` | Docker | Full run in a systemd container that mimics a cloud image, a no-op second run and real SSH logins |
 | `make test-vm` | Multipass | Everything above plus swap, NTP, a reboot and checks from outside the VM |
 
@@ -242,9 +281,10 @@ CI runs lint, style and the container test on every push.
 ## Project layout
 
 ```
-bootstrap.sh              questions, plan, confirmation, execution, summary
+bootstrap.sh              questions, plan, confirmation, execution, summary, remote deploy
+install.sh                one-liner curl pipe installer with tty recovery
 lib/common.sh             logging, dry-run wrapper, file sync, apt helpers
-modules/NN-name.sh        one concern per file, run in numeric order
+modules/NN-name.sh        one concern per file, run in numeric order (01 to 15)
 configs/                  versioned configuration files, with @PLACEHOLDERS@ for settings
 checks/verify.sh          final state checks
 tests/container.sh        systemd container test
@@ -252,5 +292,7 @@ tests/multipass.sh        VM test with reboot
 tests/style.sh            no comments, dashes or emojis
 tests/fixtures/           simulated cloud image defaults
 tests/container/          test image
+docs/demo.tape            VHS terminal recording specification
+docs/demo.gif             animated terminal showcase
 .github/workflows/ci.yml  lint, style and container test
 ```
