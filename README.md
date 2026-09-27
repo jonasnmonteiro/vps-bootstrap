@@ -15,10 +15,10 @@ each commit.
 
 ```
 # One-liner execution
-curl -fsSL https://raw.githubusercontent.com/vps-bootstrap/vps-bootstrap/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/jonasnmonteiro/vps-bootstrap/main/install.sh | sudo bash
 
 # Or clone and run locally
-git clone <this repository> && cd vps-bootstrap
+git clone https://github.com/jonasnmonteiro/vps-bootstrap.git && cd vps-bootstrap
 sudo ./bootstrap.sh --dry-run    # show the plan, change nothing
 sudo ./bootstrap.sh              # ask, show the plan, confirm, apply, verify
 

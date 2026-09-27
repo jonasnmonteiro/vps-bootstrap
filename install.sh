@@ -3,7 +3,7 @@ set -euo pipefail
 
 [[ $EUID -eq 0 ]] || { echo "Run with sudo or as root: curl ... | sudo bash" >&2; exit 1; }
 
-REPO_URL="${REPO_URL:-https://github.com/vps-bootstrap/vps-bootstrap/archive/refs/heads/main.tar.gz}"
+REPO_URL="${REPO_URL:-https://github.com/jonasnmonteiro/vps-bootstrap/archive/refs/heads/main.tar.gz}"
 TMP_DIR="$(mktemp -d /tmp/vps-bootstrap-XXXXXX)"
 
 cleanup() {
