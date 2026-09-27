@@ -15,9 +15,9 @@ list_code_files() {
 
 list_all_files() {
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    git ls-files --cached --others --exclude-standard
+    git ls-files --cached --others --exclude-standard -- ':!:*.gif' ':!:*.png' ':!:*.jpg' ':!:*.jpeg' ':!:*.webp' ':!:*.ico' ':!:*.tar.gz' ':!:*.zip'
   else
-    find . -type f ! -path './.git/*' | sed 's|^\./||'
+    find . -type f ! -path './.git/*' ! -name '*.gif' ! -name '*.png' ! -name '*.jpg' ! -name '*.jpeg' ! -name '*.webp' ! -name '*.ico' ! -name '*.tar.gz' ! -name '*.zip' | sed 's|^\./||'
   fi
 }
 
