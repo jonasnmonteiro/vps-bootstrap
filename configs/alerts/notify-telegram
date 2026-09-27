@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+msg="${1:-Node notification}"
+curl -s -X POST "https://api.telegram.org/bot@TELEGRAM_BOT_TOKEN@/sendMessage" \
+  -d "chat_id=@TELEGRAM_CHAT_ID@" \
+  -d "parse_mode=Markdown" \
+  -d "text=[$(hostname)] %0A${msg}" >/dev/null 2>&1 || true
