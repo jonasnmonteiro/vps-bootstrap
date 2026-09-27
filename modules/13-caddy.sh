@@ -7,14 +7,15 @@ describe "Install Caddy reverse proxy with automatic HTTPS and hardened headers"
 if is_installed caddy; then
   ok "Caddy is installed."
 else
-  apt_install debian-keyring debian-archive-keyring apt-transport-https
-  if [[ ! -f /usr/share/keyrings/caddy-stable-archive-keyring.gpg ]]; then
-    run curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  run install -m 0755 -d /etc/apt/keyrings
+  if [[ ! -f /etc/apt/keyrings/caddy.asc ]]; then
+    run curl -fsSL 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' -o /etc/apt/keyrings/caddy.asc
+    run chmod a+r /etc/apt/keyrings/caddy.asc
   fi
-  if [[ ! -f /etc/apt/sources.list.d/caddy-stable.list ]]; then
-    run curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
-    run apt_get update -qq
-  fi
+  echo "deb [signed-by=/etc/apt/keyrings/caddy.asc] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main" > /tmp/caddy.list
+  sync_file /tmp/caddy.list /etc/apt/sources.list.d/caddy-stable.list 644
+  rm -f /tmp/caddy.list
+  run apt_get update -qq
   apt_install caddy
 fi
 

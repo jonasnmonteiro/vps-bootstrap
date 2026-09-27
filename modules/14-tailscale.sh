@@ -10,6 +10,7 @@ hostname="${NEW_HOSTNAME:-}"
 if is_installed tailscale; then
   ok "Tailscale is installed."
 else
+  run install -m 0755 -d /usr/share/keyrings
   if [[ ! -f /usr/share/keyrings/tailscale-archive-keyring.gpg ]]; then
     run curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg -o /usr/share/keyrings/tailscale-archive-keyring.gpg
   fi
